@@ -711,29 +711,136 @@ const struct iomap_writeback_ops ntfs_writeback_ops = {
 };
 #else
 
-// TODO: implement (if needed) ntfs_map_blocks, 
-// ntfs_submit_ioend, ntfs_discard_folio for
-// backward compatibility with older kernels
-// < 6.17
+/*
+ * iomap_folio_state is an internal struct to the iomap subsystem and is not
+ * available in a public header. We define it here for compatibility.
+ * This definition is based on the one in fs/iomap/buffered-io.c.
+ */
+struct iomap_folio_state {
+	spinlock_t		state_lock;
+	unsigned int		read_bytes_pending;
+	atomic_t		write_bytes_pending;
 
-static int ntfs_map_blocks(
-	struct iomap_writepage_ctx *wpc,
-	struct inode *inode,
-	loff_t offset,
-	unsigned int len)
+	/*
+	 * Each block has two bits in this bitmap:
+	 * Bits [0..blocks_per_folio) has the uptodate status.
+	 * Bits [b_p_f...(2*b_p_f))   has the dirty status.
+	 */
+	unsigned long		state[];
+};
+
+/*
+ * Compatibility implementation for kernels < 6.17
+ */
+
+static int ntfs_map_blocks(struct iomap_writepage_ctx *wpc, struct inode *inode,
+		loff_t offset, unsigned int len)
 {
+	if (offset >= wpc->iomap.offset &&
+	    offset < wpc->iomap.offset + wpc->iomap.length)
+		return 0;
+
+	return __ntfs_write_iomap_begin(inode, offset,
+			NTFS_I(inode)->allocated_size - offset,
+			IOMAP_WRITE, &wpc->iomap, true, false);
 }
 
-static int ntfs_submit_ioend(
-	struct iomap_writepage_ctx *wpc,
-	int error)
+/*
+ * Based on iomap_finish_folio_write from fs/iomap/buffered-io.c in newer kernels.
+ */
+static void _ntfs_finish_folio_write(struct inode *inode, struct folio *folio,
+				     size_t len)
 {
+	struct iomap_folio_state *ifs = folio->private;
+
+	WARN_ON_ONCE(i_blocks_per_folio(inode, folio) > 1 && !ifs);
+	WARN_ON_ONCE(ifs && atomic_read(&ifs->write_bytes_pending) <= 0);
+
+	if (!ifs || atomic_sub_and_test(len, &ifs->write_bytes_pending))
+		folio_end_writeback(folio);
 }
 
-static void ntfs_discard_folio(
-	struct folio *folio,
-	loff_t pos)
+/*
+ * Based on iomap_finish_ioend_buffered from fs/iomap/ioend.c in newer kernels.
+ */
+static u32 _ntfs_finish_ioend_buffered(struct iomap_ioend *ioend)
 {
+	struct inode *inode = ioend->io_inode;
+	struct bio *bio = &ioend->io_bio;
+	struct folio_iter fi;
+	u32 folio_count = 0;
+
+	if (ioend->io_error) {
+		mapping_set_error(inode->i_mapping, ioend->io_error);
+		if (!bio_flagged(bio, BIO_QUIET)) {
+			pr_err_ratelimited(
+				"%s: writeback error on inode %lu, offset %lld, sector %llu",
+				inode->i_sb->s_id, inode->i_ino,
+				ioend->io_offset, ioend->io_sector);
+		}
+	}
+
+	bio_for_each_folio_all(fi, bio) {
+		_ntfs_finish_folio_write(inode, fi.folio, fi.length);
+		folio_count++;
+	}
+
+	bio_put(bio); /* frees the ioend */
+	return folio_count;
+}
+
+/*
+ * Based on ioend_writeback_end_bio from fs/iomap/ioend.c in newer kernels.
+ */
+static void _ntfs_ioend_writeback_end_bio(struct bio *bio)
+{
+	struct iomap_ioend *ioend = iomap_ioend_from_bio(bio);
+
+	ioend->io_error = blk_status_to_errno(bio->bi_status);
+	_ntfs_finish_ioend_buffered(ioend);
+}
+
+static int ntfs_submit_ioend(struct iomap_writepage_ctx *wpc, int error)
+{
+	struct iomap_ioend *ioend = wpc->ioend;
+
+	if (!ioend)
+		return error;
+
+	if (!ioend->io_bio.bi_end_io)
+		ioend->io_bio.bi_end_io = _ntfs_ioend_writeback_end_bio;
+
+	if (WARN_ON_ONCE(wpc->iomap.flags & IOMAP_F_ANON_WRITE))
+		error = -EIO;
+
+	if (error) {
+		ioend->io_bio.bi_status = errno_to_blk_status(error);
+		bio_endio(&ioend->io_bio);
+		wpc->ioend = NULL;
+		return error;
+	}
+
+	submit_bio(&ioend->io_bio);
+	wpc->ioend = NULL;
+	return 0;
+}
+
+static void ntfs_discard_folio(struct folio *folio, loff_t pos)
+{
+	struct inode *inode = folio->mapping->host;
+	struct ntfs_inode *ni = NTFS_I(inode);
+	struct ntfs_volume *vol = ni->vol;
+	loff_t len = folio_pos(folio) + folio_size(folio) - pos;
+	s64 cluster_count;
+
+	if (len <= 0)
+		return;
+
+	cluster_count = round_up(len, vol->cluster_size) >>
+			vol->cluster_size_bits;
+
+	if (cluster_count > 0)
+		ntfs_release_dirty_clusters(vol, cluster_count);
 }
 
 const struct iomap_writeback_ops ntfs_writeback_ops = {

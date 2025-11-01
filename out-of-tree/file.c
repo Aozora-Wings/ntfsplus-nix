@@ -706,6 +706,8 @@ static const struct vm_operations_struct ntfs_file_vm_ops = {
 	.page_mkwrite	= ntfs_filemap_page_mkwrite,
 };
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
+
 static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 {
 	struct file *file = desc->file;
@@ -738,6 +740,40 @@ static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 	desc->vm_ops = &ntfs_file_vm_ops;
 	return 0;
 }
+
+#else
+static int ntfs_file_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct inode *inode = file_inode(file);
+
+	if (NVolShutdown(NTFS_SB(file->f_mapping->host->i_sb)))
+		return -EIO;
+
+	if (NInoCompressed(NTFS_I(inode)))
+		return -EOPNOTSUPP;
+
+	if (vma->vm_flags & VM_WRITE) {
+		struct inode *inode = file_inode(file);
+		loff_t from, to;
+		int err;
+
+		from = ((loff_t)vma->vm_pgoff << PAGE_SHIFT);
+		to = min_t(loff_t, i_size_read(inode),
+			   from + vma->vm_end - vma->vm_start);
+
+		if (NTFS_I(inode)->initialized_size < to) {
+			err = ntfs_extend_initialized_size(inode, to, to);
+			if (err)
+				return err;
+		}
+	}
+
+
+	file_accessed(file);
+	vma->vm_ops = &ntfs_file_vm_ops;
+	return 0;
+}
+#endif
 
 static int ntfs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		u64 start, u64 len)
@@ -1037,7 +1073,11 @@ const struct file_operations ntfs_file_ops = {
 	.read_iter	= ntfs_file_read_iter,
 	.write_iter	= ntfs_file_write_iter,
 	.fsync		= ntfs_file_fsync,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
 	.mmap_prepare	= ntfs_file_mmap_prepare,
+#else
+	.mmap		= ntfs_file_mmap,
+#endif
 	.open		= ntfs_file_open,
 	.release	= ntfs_file_release,
 	.splice_read	= ntfs_file_splice_read,
