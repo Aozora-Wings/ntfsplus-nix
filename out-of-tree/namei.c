@@ -968,7 +968,7 @@ out:
 	return err;
 }
 
-static struct dentry *ntfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
+static int __ntfs_mkdir_compat(struct mnt_idmap *idmap, struct inode *dir,
 		struct dentry *dentry, umode_t mode)
 {
 	struct super_block *sb = dir->i_sb;
@@ -979,20 +979,20 @@ static struct dentry *ntfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
 	int uname_len;
 
 	if (NVolShutdown(vol))
-		return ERR_PTR(-EIO);
+		return -EIO;
 
 	uname_len = ntfs_nlstoucs(vol, dentry->d_name.name, dentry->d_name.len,
 				  &uname, NTFS_MAX_NAME_LEN);
 	if (uname_len < 0) {
 		if (uname_len != -ENAMETOOLONG)
 			ntfs_error(sb, "Failed to convert name to unicode.");
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 	}
 
 	err = ntfs_check_bad_char(uname, uname_len);
 	if (err) {
 		kmem_cache_free(ntfs_name_cache, uname);
-		return ERR_PTR(err);
+		return err;
 	}
 
 	if (!(vol->vol_flags & VOLUME_IS_DIRTY))
@@ -1002,12 +1002,22 @@ static struct dentry *ntfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
 	kmem_cache_free(ntfs_name_cache, uname);
 	if (IS_ERR(ni)) {
 		err = PTR_ERR(ni);
-		return ERR_PTR(err);
+		return err;
 	}
 
 	d_instantiate_new(dentry, VFS_I(ni));
-	return ERR_PTR(err);
+	return err;
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
+static struct dentry *ntfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
+	struct dentry *dentry, umode_t mode)
+{
+	return ERR_PTR(__ntfs_mkdir_compat(idmap, dir, dentry, mode));
+}
+#else
+#define ntfs_mkdir __ntfs_mkdir_compat
+#endif
 
 static int ntfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
