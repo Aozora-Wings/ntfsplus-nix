@@ -12,17 +12,15 @@
 #include "volume.h"
 #include "inode.h"
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0))
+#define iomap_write_ops iomap_folio_ops
+#endif
+
 extern const struct iomap_ops ntfs_write_iomap_ops;
 extern const struct iomap_ops ntfs_read_iomap_ops;
 extern const struct iomap_ops ntfs_page_mkwrite_iomap_ops;
 extern const struct iomap_ops ntfs_dio_iomap_ops;
 extern const struct iomap_writeback_ops ntfs_writeback_ops;
-extern const struct 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-  iomap_write_ops
-#else
-  iomap_folio_ops
-#endif
-    ntfs_iomap_folio_ops;
+extern const struct iomap_write_ops ntfs_iomap_folio_ops;
 int ntfs_zeroed_clusters(struct inode *vi, s64 lcn, s64 num);
 #endif /* _LINUX_NTFS_IOMAP_H */

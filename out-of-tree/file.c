@@ -318,11 +318,11 @@ int ntfs_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
 				err = iomap_zero_range(vi, old_size, len,
 						       NULL, &ntfs_read_iomap_ops
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-					      	 , &ntfs_iomap_folio_ops, NULL
+						 , &ntfs_iomap_folio_ops, NULL
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-					      	 , NULL
+						 , NULL
 #endif
-					      	 );
+						 );
 			}
 		}
 		if (ia_valid == ATTR_SIZE)
