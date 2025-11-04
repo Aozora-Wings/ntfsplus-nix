@@ -8,7 +8,7 @@ There is a new Linux driver for NTFS called [`ntfsplus`](https://lore.kernel.org
 
 This repo contains the out-of-tree kernel module for `ntfsplus` and the patches to:
 - Make it DKMS
-- Backport it to 6.17
+- Backport it to 6.12
 - Build AUR package
 
 The AUR package is available at [ntfsplus-dkms-git](https://aur.archlinux.org/packages/ntfsplus-dkms-git)
@@ -34,13 +34,13 @@ and there you go.
 
 ## Status
 
-Currently supports 6.17+ only.
+Currently supports 6.12+ only.
 
-The module was taken out of tree with my modifications. I currently haven't done much.
+I've made a [testsuite](https://github.com/shadichy/ntfsplus_tests) and run tests and suprisingly it works on 6.12.
 
 ## TODOs
 
-- Rewrite [`ntfs_iomap.c`](./out-of-tree/fs/ntfsplus/ntfs_iomap.c) to implement `ntfs_map_blocks`, `ntfs_submit_ioend` and `ntfs_discard_folio` for kernels older than 6.17
-- Backport to LTS kernels
+- ~~Rewrite [`ntfs_iomap.c`](./out-of-tree/fs/ntfsplus/ntfs_iomap.c) to implement `ntfs_map_blocks` for kernels older than 6.17~~
+- ~~Backport to LTS kernels~~
 - Port the package to Debian
 - Port the package to RedHat distros
