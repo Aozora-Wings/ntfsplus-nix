@@ -2,6 +2,7 @@
 /linux.part/
 /linux/
 *.gz
+!/ntfsplus-*.mbox.gz
 
 # Download agent
 DLAGENTS
