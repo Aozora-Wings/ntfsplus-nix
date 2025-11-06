@@ -291,14 +291,9 @@ int ntfs_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
 			/* Serialize against page faults */
 			if (NInoNonResident(NTFS_I(vi)) &&
 			    attr->ia_size < old_size) {
-				err = iomap_truncate_page(vi, attr->ia_size, NULL,
-							  &ntfs_read_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-								, &ntfs_iomap_folio_ops, NULL
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-								, NULL
-#endif
-								);
+				err = __iomap_truncate_page(vi, attr->ia_size, NULL,
+							  &ntfs_read_iomap_ops,
+							  &ntfs_iomap_folio_ops, NULL);
 				if (err)
 					goto out;
 			}
@@ -315,14 +310,9 @@ int ntfs_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
 				loff_t len = min_t(loff_t,
 							round_up(old_size, PAGE_SIZE) - old_size,
 							attr->ia_size - old_size);
-				err = iomap_zero_range(vi, old_size, len,
-						       NULL, &ntfs_read_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-						 , &ntfs_iomap_folio_ops, NULL
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-						 , NULL
-#endif
-						 );
+				err = __iomap_zero_range(vi, old_size, len,
+						       NULL, &ntfs_read_iomap_ops,
+						       &ntfs_iomap_folio_ops, NULL);
 			}
 		}
 		if (ia_valid == ATTR_SIZE)
@@ -639,11 +629,8 @@ static ssize_t ntfs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 
 			offset = iocb->ki_pos;
 			iocb->ki_flags &= ~IOCB_DIRECT;
-			written = iomap_file_buffered_write(iocb, from,
-					&ntfs_write_iomap_ops,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-					&ntfs_iomap_folio_ops,
-#endif
+			written = __iomap_file_buffered_write(iocb, from,
+					&ntfs_write_iomap_ops, &ntfs_iomap_folio_ops,
 					NULL);
 			if (written < 0) {
 				err = written;
@@ -662,11 +649,8 @@ static ssize_t ntfs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 							 end >> PAGE_SHIFT);
 		}
 	} else {
-		ret = iomap_file_buffered_write(iocb, from, &ntfs_write_iomap_ops,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-				&ntfs_iomap_folio_ops,
-#endif
-				NULL);
+		ret = __iomap_file_buffered_write(iocb, from, &ntfs_write_iomap_ops,
+				&ntfs_iomap_folio_ops, NULL);
 	}
 out:
 	if (ret < 0 && ret != -EIOCBQUEUED) {
@@ -699,11 +683,7 @@ static vm_fault_t ntfs_filemap_page_mkwrite(struct vm_fault *vmf)
 	sb_start_pagefault(inode->i_sb);
 	file_update_time(vmf->vma->vm_file);
 
-	ret = iomap_page_mkwrite(vmf, &ntfs_page_mkwrite_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-		, NULL
-#endif
-		);
+	ret = __iomap_page_mkwrite(vmf, &ntfs_page_mkwrite_iomap_ops, NULL);
 	sb_end_pagefault(inode->i_sb);
 	return ret;
 }
@@ -715,7 +695,6 @@ static const struct vm_operations_struct ntfs_file_vm_ops = {
 };
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
-
 static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 {
 	struct file *file = desc->file;
@@ -991,14 +970,9 @@ static long ntfs_fallocate(struct file *file, int mode, loff_t offset, loff_t le
 
 			to = min_t(loff_t, (start_vcn + 1) << vol->cluster_size_bits,
 				   end_offset);
-			err = iomap_zero_range(vi, offset, to - offset, NULL,
-					       &ntfs_read_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-					       , &ntfs_iomap_folio_ops, NULL
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-					       , NULL
-#endif
-					       );
+			err = __iomap_zero_range(vi, offset, to - offset, NULL,
+					       &ntfs_read_iomap_ops,
+					       &ntfs_iomap_folio_ops, NULL);
 			if (err < 0 || (end_vcn - start_vcn) == 1)
 				goto out;
 			start_vcn++;
@@ -1007,14 +981,9 @@ static long ntfs_fallocate(struct file *file, int mode, loff_t offset, loff_t le
 			loff_t from;
 
 			from = (end_vcn - 1) << vol->cluster_size_bits;
-			err = iomap_zero_range(vi, from, end_offset - from, NULL,
-					       &ntfs_read_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-					       , &ntfs_iomap_folio_ops, NULL
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-					       , NULL
-#endif
-					       );
+			err = __iomap_zero_range(vi, from, end_offset - from, NULL,
+					       &ntfs_read_iomap_ops,
+					       &ntfs_iomap_folio_ops, NULL);
 			if (err < 0 || (end_vcn - start_vcn) == 1)
 				goto out;
 			end_vcn--;
@@ -1064,14 +1033,9 @@ out:
 			loff_t len = min_t(loff_t,
 					   round_up(old_size, PAGE_SIZE) - old_size,
 					   offset - old_size);
-			err = iomap_zero_range(vi, old_size, len, NULL,
-					       &ntfs_read_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-					       , &ntfs_iomap_folio_ops, NULL
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-					       , NULL
-#endif
-					       );
+			err = __iomap_zero_range(vi, old_size, len, NULL,
+					       &ntfs_read_iomap_ops,
+					       &ntfs_iomap_folio_ops, NULL);
 		}
 		NInoSetFileNameDirty(ni);
 		inode_set_mtime_to_ts(vi, inode_set_ctime_current(vi));

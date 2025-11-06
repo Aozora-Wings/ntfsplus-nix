@@ -351,4 +351,31 @@ int ntfs_extend_initialized_size(struct inode *vi, const loff_t offset,
 		const loff_t new_size);
 void ntfs_set_vfs_operations(struct inode *inode, mode_t mode, dev_t dev);
 
+/*
+ * Wrappers for backward compatibility
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+#define __iomap_file_buffered_write iomap_file_buffered_write
+#define __iomap_truncate_page iomap_truncate_page
+#define __iomap_zero_range iomap_zero_range
+#define __iomap_page_mkwrite iomap_page_mkwrite
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
+#define __iomap_file_buffered_write(iocb, from, ops, __write_ops, private) \
+	iomap_file_buffered_write(iocb, from, ops, private)
+#define __iomap_truncate_page(inode, pos, did_zero, ops, __write_ops, private) \
+	iomap_truncate_page(inode, pos, did_zero, ops, private)
+#define __iomap_zero_range(inode, pos, len, did_zero, ops, __write_ops, private) \
+	iomap_zero_range(inode, pos, len, did_zero, ops, private)
+#define __iomap_page_mkwrite iomap_page_mkwrite
+#else
+#define __iomap_file_buffered_write(iocb, from, ops, __write_ops, private) \
+	iomap_file_buffered_write(iocb, from, ops, private)
+#define __iomap_truncate_page(inode, pos, did_zero, ops, __write_ops, __private) \
+	iomap_truncate_page(inode, pos, did_zero, ops)
+#define __iomap_zero_range(inode, pos, len, did_zero, ops, __write_ops, __private) \
+	iomap_zero_range(inode, pos, len, did_zero, ops)
+#define __iomap_page_mkwrite(vmf, ops, __private) \
+	iomap_page_mkwrite(vmf, ops)
+#endif
+
 #endif /* _LINUX_NTFS_INODE_H */

@@ -2416,15 +2416,10 @@ int ntfs_extend_initialized_size(struct inode *vi, const loff_t offset,
 		return err;
 
 	if (!NInoCompressed(ni) && old_init_size < offset) {
-		err = iomap_zero_range(vi, old_init_size,
+		err = __iomap_zero_range(vi, old_init_size,
 				       offset - old_init_size,
-				       NULL, &ntfs_read_iomap_ops
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
-							 , &ntfs_iomap_folio_ops, NULL
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
-							 , NULL
-#endif
-							 );
+				       NULL, &ntfs_read_iomap_ops,
+				       &ntfs_iomap_folio_ops, NULL);
 		if (err)
 			return err;
 	}
