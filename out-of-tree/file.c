@@ -694,10 +694,10 @@ static const struct vm_operations_struct ntfs_file_vm_ops = {
 	.page_mkwrite	= ntfs_filemap_page_mkwrite,
 };
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
-static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
+static int __ntfs_file_mmap_compat(struct file *file, unsigned long vm_flags,
+	unsigned long pgoff, unsigned long start, unsigned long end,
+	const struct vm_operations_struct **vm_ops)
 {
-	struct file *file = desc->file;
 	struct inode *inode = file_inode(file);
 
 	if (NVolShutdown(NTFS_SB(file->f_mapping->host->i_sb)))
@@ -706,14 +706,14 @@ static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 	if (NInoCompressed(NTFS_I(inode)))
 		return -EOPNOTSUPP;
 
-	if (desc->vm_flags & VM_WRITE) {
+	if (vm_flags & VM_WRITE) {
 		struct inode *inode = file_inode(file);
 		loff_t from, to;
 		int err;
 
-		from = ((loff_t)desc->pgoff << PAGE_SHIFT);
+		from = ((loff_t)pgoff << PAGE_SHIFT);
 		to = min_t(loff_t, i_size_read(inode),
-			   from + desc->end - desc->start);
+			   from + end - start);
 
 		if (NTFS_I(inode)->initialized_size < to) {
 			err = ntfs_extend_initialized_size(inode, to, to);
@@ -724,41 +724,20 @@ static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 
 
 	file_accessed(file);
-	desc->vm_ops = &ntfs_file_vm_ops;
+	*vm_ops = &ntfs_file_vm_ops;
 	return 0;
 }
 
-#else
-static int ntfs_file_mmap(struct file *file, struct vm_area_struct *vma)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
+static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 {
-	struct inode *inode = file_inode(file);
-
-	if (NVolShutdown(NTFS_SB(file->f_mapping->host->i_sb)))
-		return -EIO;
-
-	if (NInoCompressed(NTFS_I(inode)))
-		return -EOPNOTSUPP;
-
-	if (vma->vm_flags & VM_WRITE) {
-		struct inode *inode = file_inode(file);
-		loff_t from, to;
-		int err;
-
-		from = ((loff_t)vma->vm_pgoff << PAGE_SHIFT);
-		to = min_t(loff_t, i_size_read(inode),
-			   from + vma->vm_end - vma->vm_start);
-
-		if (NTFS_I(inode)->initialized_size < to) {
-			err = ntfs_extend_initialized_size(inode, to, to);
-			if (err)
-				return err;
-		}
-	}
-
-
-	file_accessed(file);
-	vma->vm_ops = &ntfs_file_vm_ops;
-	return 0;
+	return __ntfs_file_mmap_compat(desc->file, desc->vm_flags, desc->pgoff,
+		desc->start, desc->end, &desc->vm_ops);
+}
+#else
+static int ntfs_file_mmap(struct file *file, struct vm_area_struct *vma) {
+	return __ntfs_file_mmap_compat(file, vma->vm_flags, vma->vm_pgoff,
+		vma->vm_start, vma->vm_end, &vma->vm_ops);
 }
 #endif
 
