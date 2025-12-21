@@ -1,1 +1,11 @@
-SUBSYSTEM=="block", ENV{ID_FS_TYPE}=="ntfs", ENV{ID_FS_TYPE}="ntfsplus"
+# Prefer ntfsplus over other NTFS drivers
+# This rule ensures ntfsplus is loaded before ntfs3 or other NTFS drivers
+
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_TYPE}=="ntfs", \
+  RUN+="/sbin/modprobe ntfsplus"
+
+# Alternative: Use udev property to indicate ntfsplus preference
+# ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_TYPE}=="ntfs", \
+#   ENV{SYSTEMD_READY}="0", \
+#   RUN+="/sbin/modprobe ntfsplus", \
+#   OPTIONS+="last_rule"

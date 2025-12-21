@@ -1,0 +1,16 @@
+# NTFS+ 适配补丁 - 内核 6.15
+# 基于: patch-5.patch
+# 自动生成 - 2025年 12月 21日 星期日 13:55:06 CST
+
+diff --git a/fs/Kconfig b/fs/Kconfig
+index 0bfdaecaa877..70d596b99c8b 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -153,6 +153,7 @@ menu "DOS/FAT/EXFAT/NT Filesystems"
+ source "fs/fat/Kconfig"
+ source "fs/exfat/Kconfig"
+ source "fs/ntfs3/Kconfig"
++source "fs/ntfsplus/Kconfig"
+ 
+ endmenu
+ endif # BLOCK
