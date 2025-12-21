@@ -9,10 +9,15 @@
 #include <linux/writeback.h>
 #include <linux/seq_file.h>
 
-// Replace inode_generic_drop with generic_drop_inode
-// for backward compatibility with pre 6.18 kernels
-#ifndef inode_generic_drop
+// Handle inode_generic_drop/generic_drop_inode compatibility
+// for kernels 6.17 and 6.18
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
+// For kernels before 6.18, use generic_drop_inode
 #define inode_generic_drop generic_drop_inode
+#else
+// For kernel 6.18+, inode_generic_drop is already defined by the kernel
+// No definition needed
 #endif
 
 #include "lcnalloc.h"
