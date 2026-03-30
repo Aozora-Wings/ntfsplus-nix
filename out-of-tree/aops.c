@@ -116,10 +116,11 @@ static int ntfs_read_folio(struct file *file, struct folio *folio)
 
 	//return iomap_read_folio(folio, &ntfs_read_iomap_ops);
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
-		/* Linux 6.19+ 使用新接口 */
-		return iomap_read_folio(&ntfs_read_iomap_ops, NULL);
+		/* Linux 6.19+ 使用新接口，返回 void */
+		iomap_read_folio(&ntfs_read_iomap_ops, NULL);
+		return 0;
 	#else
-		/* Linux 6.18 及更早版本使用旧接口 */
+		/* Linux 6.18 及更早版本使用旧接口，返回 int */
 		return iomap_read_folio(folio, &ntfs_read_iomap_ops);
 	#endif
 }
