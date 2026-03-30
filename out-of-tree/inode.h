@@ -383,14 +383,7 @@ void ntfs_set_vfs_operations(struct inode *inode, mode_t mode, dev_t dev);
  * i_state access helpers for kernel 6.19+
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-static inline unsigned int ntfs_inode_state_read(struct inode *inode)
-{
-	unsigned int state;
-	
-	lockdep_assert_held(&inode->i_lock);
-	state = inode_state_read(inode);
-	return state;
-}
+#define ntfs_inode_state_read(inode) (inode_state_read(inode))
 #else
 #define ntfs_inode_state_read(inode) ((inode)->i_state)
 #endif
