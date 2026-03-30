@@ -1,20 +1,41 @@
-From 731ee528ae18f8cc779cc230713e1147192acc07 Mon Sep 17 00:00:00 2001
 From: shadichy <shadichy@blisslabs.org>
 Date: Thu, 6 Nov 2025 16:39:19 +0700
-Subject: [PATCH 2/7] ntfsplus: Resolve iomap_* arguments (temporarily) for
- kernel older than 6.17
+Subject: [PATCH 2/7] ntfsplus: Resolve iomap_* arguments for kernel 6.17+
 
+Add compatibility for:
+- iomap_writepages API change in 6.17
+- iomap_read_folio/iomap_readahead API change in 6.19
+
+Signed-off-by: shadichy <shadichy@blisslabs.org>
 ---
- fs/ntfsplus/aops.c  |  9 +++++++++
+ fs/ntfsplus/aops.c  | 11 +++++++++--
  fs/ntfsplus/file.c  | 14 +++++++-------
  fs/ntfsplus/inode.c |  2 +-
- fs/ntfsplus/inode.h | 13 +++++++++++++
- 4 files changed, 30 insertions(+), 8 deletions(-)
+ fs/ntfsplus/inode.h | 32 ++++++++++++++++++++++++++++++++
+ 4 files changed, 49 insertions(+), 10 deletions(-)
 
 diff --git a/fs/ntfsplus/aops.c b/fs/ntfsplus/aops.c
-index 9a1b3b80a..d9784dfc9 100644
+index 9a1b3b80a..xxxxxxxxx 100644
 --- a/fs/ntfsplus/aops.c
 +++ b/fs/ntfsplus/aops.c
+@@ -114,7 +114,7 @@ static int ntfs_read_folio(struct file *file, struct folio *folio)
+ 			return ntfs_read_compressed_block(folio);
+ 	}
+ 
+-	return iomap_read_folio(folio, &ntfs_read_iomap_ops);
++	return __iomap_read_folio(folio, &ntfs_read_iomap_ops);
+ }
+ 
+ static int ntfs_write_mft_block(struct ntfs_inode *ni, struct folio *folio,
+@@ -416,7 +416,7 @@ static void ntfs_readahead(struct readahead_control *rac)
+ 	    (ni->mft_no == FILE_MFT || ni->mft_no == FILE_MFTMirr))
+ 		return;
+ 
+-	iomap_readahead(rac, &ntfs_read_iomap_ops);
++	__iomap_readahead(rac, &ntfs_read_iomap_ops);
+ }
+ 
+ static int ntfs_mft_writepage(struct folio *folio, struct writeback_control *wbc)
 @@ -447,9 +447,13 @@ static int ntfs_writepages(struct address_space *mapping,
  {
  	struct inode *inode = mapping->host;
@@ -123,13 +144,14 @@ index fb5f40e19..7ed279c7b 100644
  				       NULL, &ntfs_read_iomap_ops,
  				       &ntfs_iomap_folio_ops, NULL);
 diff --git a/fs/ntfsplus/inode.h b/fs/ntfsplus/inode.h
-index 95fee0fd2..ae3377bc7 100644
+index 95fee0fd2..yyyyyyyyy 100644
 --- a/fs/ntfsplus/inode.h
 +++ b/fs/ntfsplus/inode.h
-@@ -350,4 +350,17 @@ int ntfs_extend_initialized_size(struct inode *vi, const loff_t offset,
+@@ -350,4 +350,36 @@ int ntfs_extend_initialized_size(struct inode *vi, const loff_t offset,
  		const loff_t new_size);
  void ntfs_set_vfs_operations(struct inode *inode, mode_t mode, dev_t dev);
  
++/* iomap API compatibility for Linux 6.17+ */
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
 +#define __iomap_file_buffered_write iomap_file_buffered_write
 +#define __iomap_truncate_page iomap_truncate_page
@@ -143,7 +165,24 @@ index 95fee0fd2..ae3377bc7 100644
 +	iomap_zero_range(inode, pos, len, did_zero, ops, private)
 +#endif
 +
++/* iomap_read_folio and iomap_readahead compatibility for Linux 6.19+ */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++static inline int __iomap_read_folio(struct folio *folio, const struct iomap_ops *ops)
++{
++	struct iomap_read_folio_ctx ctx = { .folio = folio };
++	iomap_read_folio(ops, &ctx);
++	return 0;
++}
++
++static inline void __iomap_readahead(struct readahead_control *rac, const struct iomap_ops *ops)
++{
++	struct iomap_read_folio_ctx ctx = { .rac = rac };
++	iomap_readahead(ops, &ctx);
++}
++#else
++#define __iomap_read_folio iomap_read_folio
++#define __iomap_readahead iomap_readahead
++#endif
  #endif /* _LINUX_NTFS_INODE_H */
 -- 
 2.52.0
-

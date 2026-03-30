@@ -123,7 +123,6 @@ source=(
   '0005-ntfsplus-compress.c-using-page-index-instead-of-page.patch'
   '0006-ntfsplus-Update-iomap_zero_range-iomap_page_mkwrite-.patch'
   '0007-ntfsplus-Backport-ntfs_mkdir-for-kernels-older-than-.patch'
-  '0008-ntfsplus-Fix-iomap-API-for-Linux-6.19.patch'
   '0099-fs-ntfsplus-Makefile-DKMS-patch.patch'
   'dkms.conf'
   '90-udev-prefer-ntfsplus.rules'
@@ -131,13 +130,12 @@ source=(
 sha256sums=(
   SKIP
   868519f029a18eb0b563020386fc9ab55fc31ed611e19f2eb446894a2677d416
-  4bdb0d5c97bd676ee077d9ffccbaf67eadf232b23c3e9fe060780df6420e9513
+  1e67c2d6f62a67e61d097a73f439930b7fb0fcf254a97c837d6bcb035c9dea98
   78353b18ad7e37d390d79bc22f424a8042351e30eb01a17e4e7ffadafb6c7dce
   f8dbf89bfa7891adcba1c9900a8b4f31c59a6e32bf3c4b1b290073eed048e8d9
   0e971dcea24f447ee4349cab0764a55c8311cf668ce56343d1c1b325777e624d
   42d1b84476b71fb5cce03273cb1075698639c788b4307374c166d163370dbcc8
   89d0665e7e6ebabce544d008e6a18e8c2182e1c21692ac17fd5d466bed9591b2
-  47d1258dd9f5dc6034143ecdfc0b40d8203ddad5fffff66b8387c9491260dfd2
   e217fa145f507b1e07e228e746528554f705f44fd5744f293b302b29df764b96
   99e3d34a646c13fd207b3d88265fb3fc2b7a0b88fd3461f0dc75669e7260ffc4
   e3866cac3d71da15740159c89b233d4d1f61981dbf737d4e3bc9a4c56bfa24be
