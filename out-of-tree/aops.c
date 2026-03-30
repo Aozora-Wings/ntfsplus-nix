@@ -114,7 +114,14 @@ static int ntfs_read_folio(struct file *file, struct folio *folio)
 			return ntfs_read_compressed_block(folio);
 	}
 
-	return iomap_read_folio(folio, &ntfs_read_iomap_ops);
+	//return iomap_read_folio(folio, &ntfs_read_iomap_ops);
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
+		/* Linux 6.19+ 使用新接口 */
+		return iomap_read_folio(&ntfs_read_iomap_ops, NULL);
+	#else
+		/* Linux 6.18 及更早版本使用旧接口 */
+		return iomap_read_folio(folio, &ntfs_read_iomap_ops);
+	#endif
 }
 
 static int ntfs_write_mft_block(struct ntfs_inode *ni, struct folio *folio,
@@ -403,21 +410,45 @@ hole:
 
 static void ntfs_readahead(struct readahead_control *rac)
 {
-	struct address_space *mapping = rac->mapping;
-	struct inode *inode = mapping->host;
-	struct ntfs_inode *ni = NTFS_I(inode);
+    struct address_space *mapping = rac->mapping;
+    struct inode *inode = mapping->host;
+    struct ntfs_inode *ni = NTFS_I(inode);
 
-	if (!NInoNonResident(ni) || NInoCompressed(ni)) {
-		/* No readahead for resident and compressed. */
-		return;
-	}
+    if (!NInoNonResident(ni) || NInoCompressed(ni)) {
+        /* No readahead for resident and compressed. */
+        return;
+    }
 
-	if (NInoMstProtected(ni) &&
-	    (ni->mft_no == FILE_MFT || ni->mft_no == FILE_MFTMirr))
-		return;
+    if (NInoMstProtected(ni) &&
+        (ni->mft_no == FILE_MFT || ni->mft_no == FILE_MFTMirr))
+        return;
 
-	iomap_readahead(rac, &ntfs_read_iomap_ops);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
+    /* Linux 6.19+ 使用新接口 */
+    iomap_readahead(&ntfs_read_iomap_ops, NULL);
+#else
+    /* Linux 6.18 及更早版本使用旧接口 */
+    iomap_readahead(rac, &ntfs_read_iomap_ops);
+#endif
 }
+
+// static void ntfs_readahead(struct readahead_control *rac)
+// {
+// 	struct address_space *mapping = rac->mapping;
+// 	struct inode *inode = mapping->host;
+// 	struct ntfs_inode *ni = NTFS_I(inode);
+
+// 	if (!NInoNonResident(ni) || NInoCompressed(ni)) {
+// 		/* No readahead for resident and compressed. */
+// 		return;
+// 	}
+
+// 	if (NInoMstProtected(ni) &&
+// 	    (ni->mft_no == FILE_MFT || ni->mft_no == FILE_MFTMirr))
+// 		return;
+
+// 	iomap_readahead(rac, &ntfs_read_iomap_ops);
+// }
 
 static int ntfs_mft_writepage(struct folio *folio, struct writeback_control *wbc)
 {
