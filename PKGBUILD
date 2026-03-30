@@ -124,6 +124,7 @@ source=(
   '0006-ntfsplus-Update-iomap_zero_range-iomap_page_mkwrite-.patch'
   '0007-ntfsplus-Backport-ntfs_mkdir-for-kernels-older-than-.patch'
   '0008-ntfsplus-fix-i_state-access-for-linux-6.19.patch'
+  '0009-ntfsplus-fix-iomap-read-ctx-for-6.19.patch'
   '0099-fs-ntfsplus-Makefile-DKMS-patch.patch'
   'dkms.conf'
   '90-udev-prefer-ntfsplus.rules'
@@ -138,6 +139,7 @@ sha256sums=(
   42d1b84476b71fb5cce03273cb1075698639c788b4307374c166d163370dbcc8
   89d0665e7e6ebabce544d008e6a18e8c2182e1c21692ac17fd5d466bed9591b2
   b19e0d5960f5bd8ce0b5b1d64cb90bb11fd0c428087b1780f169a54a7b8c5107
+  c5bcf113ed402f41118d1c75f973ce05fda29d13ebfefb5288d9975a7ae8c764
   e217fa145f507b1e07e228e746528554f705f44fd5744f293b302b29df764b96
   99e3d34a646c13fd207b3d88265fb3fc2b7a0b88fd3461f0dc75669e7260ffc4
   e3866cac3d71da15740159c89b233d4d1f61981dbf737d4e3bc9a4c56bfa24be

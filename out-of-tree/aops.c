@@ -116,8 +116,16 @@ static int ntfs_read_folio(struct file *file, struct folio *folio)
 
 	//return iomap_read_folio(folio, &ntfs_read_iomap_ops);
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
-		/* Linux 6.19+ 使用新接口，返回 void */
-		iomap_read_folio(&ntfs_read_iomap_ops, NULL);
+		/* Linux 6.19+ 使用新接口 */
+		struct iomap_read_folio_ctx ctx = {
+			.ops = &iomap_bio_read_ops,
+			.cur_folio = folio,
+		};
+		iomap_read_folio(&ntfs_read_iomap_ops, &ctx);
+		
+		/* 检查是否有错误 */
+		if (folio_test_error(folio))
+			return -EIO;
 		return 0;
 	#else
 		/* Linux 6.18 及更早版本使用旧接口，返回 int */
@@ -424,13 +432,17 @@ static void ntfs_readahead(struct readahead_control *rac)
         (ni->mft_no == FILE_MFT || ni->mft_no == FILE_MFTMirr))
         return;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
-    /* Linux 6.19+ 使用新接口 */
-    iomap_readahead(&ntfs_read_iomap_ops, NULL);
-#else
-    /* Linux 6.18 及更早版本使用旧接口 */
-    iomap_readahead(rac, &ntfs_read_iomap_ops);
-#endif
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0))
+		/* Linux 6.19+ 使用新接口 */
+		struct iomap_read_folio_ctx ctx = {
+			.ops = &iomap_bio_read_ops,
+			.rac = rac,
+		};
+		iomap_readahead(&ntfs_read_iomap_ops, &ctx);
+	#else
+		/* Linux 6.18 及更早版本使用旧接口 */
+		iomap_readahead(rac, &ntfs_read_iomap_ops);
+	#endif
 }
 
 // static void ntfs_readahead(struct readahead_control *rac)
