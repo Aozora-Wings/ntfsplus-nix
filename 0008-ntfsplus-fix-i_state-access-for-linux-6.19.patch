@@ -1,0 +1,30 @@
+--- a/fs/ntfsplus/inode.h
++++ b/fs/ntfsplus/inode.h
+@@ -377,4 +377,16 @@ void ntfs_set_vfs_operations(struct inode *inode, mode_t mode, dev_t dev);
+ 	iomap_page_mkwrite(vmf, ops)
+ #endif
+ 
++/*
++ * i_state access helpers for kernel 6.19+
++ */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++static inline unsigned int ntfs_inode_state_read(struct inode *inode)
++{
++	return inode_state_read(inode);
++}
++#else
++#define ntfs_inode_state_read(inode) ((inode)->i_state)
++#endif
++
+ #endif /* _LINUX_NTFS_INODE_H */
+--- a/fs/ntfsplus/file.c
++++ b/fs/ntfsplus/file.c
+@@ -205,7 +205,7 @@ static int ntfs_file_fsync(struct file *filp, loff_t start, loff_t end,
+ 			if (IS_ERR(attr_vi))
+ 				continue;
+ 			spin_lock(&attr_vi->i_lock);
+-			if (attr_vi->i_state & I_DIRTY_PAGES) {
++			if (ntfs_inode_state_read(attr_vi) & I_DIRTY_PAGES) {
+ 				spin_unlock(&attr_vi->i_lock);
+ 				filemap_write_and_wait(attr_vi->i_mapping);
+ 			} else
