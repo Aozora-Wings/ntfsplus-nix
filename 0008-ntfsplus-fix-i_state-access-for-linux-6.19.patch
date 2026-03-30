@@ -8,10 +8,7 @@
 + * i_state access helpers for kernel 6.19+
 + */
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-+static inline unsigned int ntfs_inode_state_read(struct inode *inode)
-+{
-+	return inode_state_read(inode);
-+}
++#define ntfs_inode_state_read(inode) (inode_state_read(inode))
 +#else
 +#define ntfs_inode_state_read(inode) ((inode)->i_state)
 +#endif
@@ -28,3 +25,67 @@
  				spin_unlock(&attr_vi->i_lock);
  				filemap_write_and_wait(attr_vi->i_mapping);
  			} else
+--- a/fs/ntfsplus/inode.c
++++ b/fs/ntfsplus/inode.c
+@@ -185,7 +185,7 @@ struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
+ 	if (IS_ERR(vi))
+ 		goto out;
+ 
+-	if (vi->i_state & I_NEW) {
++	if (ntfs_inode_state_read(vi) & I_NEW) {
+ 		ntfs_debug("Allocated new inode 0x%lx.", mft_no);
+ 		err = ntfs_read_locked_inode(vi);
+ 		if (unlikely(err)) {
+@@ -245,7 +245,7 @@ struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPE type,
+ 	if (IS_ERR(vi))
+ 		goto out;
+ 
+-	if (vi->i_state & I_NEW) {
++	if (ntfs_inode_state_read(vi) & I_NEW) {
+ 		ntfs_debug("Allocated new inode.");
+ 		err = ntfs_read_locked_attr_inode(base_vi, vi);
+ 		if (unlikely(err)) {
+@@ -300,7 +300,7 @@ struct inode *ntfs_index_iget(struct inode *base_vi, const void *name,
+ 	if (IS_ERR(vi))
+ 		goto out;
+ 
+-	if (vi->i_state & I_NEW) {
++	if (ntfs_inode_state_read(vi) & I_NEW) {
+ 		ntfs_debug("Allocated new inode.");
+ 		err = ntfs_read_locked_index_inode(base_vi, vi, name, name_len);
+ 		if (unlikely(err)) {
+@@ -392,7 +392,7 @@ void ntfs_drop_big_inode(struct inode *inode)
+ 	ntfs_debug("Entering for inode 0x%lx.", inode->i_ino);
+ 	BUG_ON(is_bad_inode(inode));
+ 
+-	if (!inode_unhashed(inode) && inode->i_state & I_SYNC) {
++	if (!inode_unhashed(inode) && ntfs_inode_state_read(inode) & I_SYNC) {
+ 		ntfs_warning(inode->i_sb, "VFS is tearing down inode and we "
+ 			     "have I_SYNC set.  This is almost certainly a "
+ 			     "bug in the VFS, please report to LKML.");
+--- a/fs/ntfsplus/mft.c
++++ b/fs/ntfsplus/mft.c
+@@ -694,7 +694,7 @@ static int ntfs_mft_bitmap_find_and_alloc(struct super_block *sb,
+ 		/* If the inode is still being set up skip it. */
+ 		if (inode && is_bad_inode(inode))
+ 			goto skip_inode;
+-		if (vi->i_state & I_CREATING) {
++		if (ntfs_inode_state_read(vi) & I_CREATING) {
+ 			ntfs_debug("Skipping inode 0x%lx because it is still being created.",
+ 					vi->i_ino);
+ 			goto skip_inode;
+--- a/fs/ntfsplus/namei.c
++++ b/fs/ntfsplus/namei.c
+@@ -490,7 +490,11 @@ static struct dentry *ntfs_lookup(struct inode *dir_vi, struct dentry *dentry,
+ 		goto out;
+ 	}
+ 	/* Instantiate the dentry. */
+-	vi->i_state = I_NEW | I_CREATING;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++	inode_state_set(vi, I_NEW | I_CREATING);
++#else
++	vi->i_state = I_NEW | I_CREATING;
++#endif
+ 	d_instantiate(dentry, vi);
+ out:
+ 	ntfs_debug("Done.");
