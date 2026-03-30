@@ -10,13 +10,13 @@ Linux 6.19 changed iomap_read_folio and iomap_readahead signatures:
 
 Signed-off-by: WuTong <wt@qkzy.net>
 ---
- out-of-tree/aops.c | 18 +++++++++++++++++-
+ fs/ntfsplus/aops.c | 18 +++++++++++++++++-
  1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/out-of-tree/aops.c b/out-of-tree/aops.c
+diff --git a/fs/ntfsplus/aops.c b/fs/ntfsplus/aops.c
 index xxxxxxx..yyyyyyy 100644
---- a/out-of-tree/aops.c
-+++ b/out-of-tree/aops.c
+--- a/fs/ntfsplus/aops.c
++++ b/fs/ntfsplus/aops.c
 @@ -114,7 +114,14 @@ static int ntfs_read_folio(struct file *file, struct folio *folio)
  			return ntfs_read_compressed_block(folio);
  	}
